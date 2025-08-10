@@ -1,0 +1,11 @@
+# Compiled object files
+*.o
+
+# Compiled binary
+demo
+
+# VS Code settings (optional)
+.vscode/
+
+# macOS / Linux temp files
+.DS_Store
