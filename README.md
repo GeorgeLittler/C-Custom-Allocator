@@ -1,6 +1,8 @@
 # Custom Memory Allocator (Round 1)
 
-A tiny C allocator managing a fixed mmap'ed arena using a simple free list.
+A lightweight C memory allocator using a fixed `mmap` arena and a simple free list.  
+Designed to demonstrate low-level memory management concepts such as manual allocation, alignment, and free-list traversal.
+
 **Round 1** includes:
 - Fixed-size arena (`mmap`)
 - First-fit allocation
@@ -13,15 +15,13 @@ A tiny C allocator managing a fixed mmap'ed arena using a simple free list.
 - Basic benchmarks vs `malloc`/`free`
 - Debug mode to print heap layout
 
-## Build & Run
+## Build & Quick Start
 ```bash
+# Build & Run
 make
 ./demo
----
 
 # Quick start (terminal steps)
-
-```bash
 # 1) Create repo
 mkdir c-custom-allocator && cd c-custom-allocator
 git init
