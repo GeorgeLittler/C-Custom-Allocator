@@ -15,24 +15,7 @@ Designed to demonstrate low-level memory management concepts such as manual allo
 - Basic benchmarks vs `malloc`/`free`
 - Debug mode to print heap layout
 
-## Build & Quick Start
+## Build & Run
 ```bash
-# Build & Run
 make
 ./demo
-
-# Quick start (terminal steps)
-# 1) Create repo
-mkdir c-custom-allocator && cd c-custom-allocator
-git init
-
-# 2) Add files from above
-# (Create the five files: allocator.h, allocator.c, demo.c, Makefile, README.md)
-
-# 3) Build & run
-make
-./demo
-
-# 4) First half-commit (Round 1)
-git add .
-git commit -m "Round 1: basic allocator with fixed arena, first-fit, and free (no split/coalesce)"
