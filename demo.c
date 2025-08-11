@@ -3,27 +3,26 @@
 #include <string.h>
 
 int main(void) {
-    if (allocator_init(1024 * 1024) != 0) { // 1 MiB arena
+    if (allocator_init(1024 * 1024) != 0) { // 1 MiB
         fprintf(stderr, "allocator_init failed\n");
         return 1;
     }
 
-    void* p = a_malloc(64);
-    void* q = a_malloc(200);
-    void* r = a_malloc(8000);
+    void* a = a_malloc(64);
+    void* b = a_malloc(200);
+    void* c = a_malloc(8000);
 
-    if (!p || !q || !r) {
-        fprintf(stderr, "allocation failed\n");
-        allocator_destroy();
-        return 1;
-    }
+#ifdef ALLOCATOR_DEBUG
+    allocator_dump();
+#endif
 
-    strcpy((char*)p, "Hello from a_malloc!");
-    printf("%s\n", (char*)p);
+    a_free(b);           // free middle
+    a_free(a);           // free adjacent -> should coalesce with b
+    a_free(c);
 
-    a_free(q);
-    a_free(p);
-    a_free(r);
+#ifdef ALLOCATOR_DEBUG
+    allocator_dump();
+#endif
 
     allocator_destroy();
     return 0;

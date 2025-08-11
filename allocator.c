@@ -4,19 +4,59 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 typedef struct block {
     size_t size;           // usable payload bytes in this block
     int    free;           // 1 = free, 0 = used
-    struct block* next;    // next block in the free list / heap list
+    struct block* next;    // (unused for implicit list; kept for future)
 } block_t;
 
 static void*    g_arena       = NULL;
 static size_t   g_arena_size  = 0;
 static block_t* g_head        = NULL;
 
-static size_t align8(size_t n) {
-    return (n + 7u) & ~((size_t)7u);
+static size_t align8(size_t n) { return (n + 7u) & ~((size_t)7u); }
+
+static block_t* next_block(block_t* blk) {
+    if (!blk) return NULL;
+    uint8_t* p = (uint8_t*)blk + sizeof(block_t) + blk->size;
+    if ((void*)p >= (uint8_t*)g_arena + g_arena_size) return NULL;
+    return (block_t*)p;
+}
+
+static block_t* prev_block(block_t* blk) {
+    // Implicit list: walk from head until next is blk
+    if (blk == g_head) return NULL;
+    block_t* cur = g_head;
+    while (cur) {
+        block_t* nb = next_block(cur);
+        if (nb == blk) return cur;
+        if (!nb) break;
+        cur = nb;
+    }
+    return NULL;
+}
+
+static void coalesce(block_t* blk) {
+    // merge forward
+    block_t* nb = next_block(blk);
+    while (nb && nb->free) {
+        blk->size += sizeof(block_t) + nb->size;
+        nb = next_block(blk);
+    }
+    // try merge backward
+    block_t* pb = prev_block(blk);
+    if (pb && pb->free) {
+        pb->size += sizeof(block_t) + blk->size;
+        blk = pb;
+        // after merging backward, try forward again just in case
+        nb = next_block(blk);
+        while (nb && nb->free) {
+            blk->size += sizeof(block_t) + nb->size;
+            nb = next_block(blk);
+        }
+    }
 }
 
 int allocator_init(size_t arena_bytes) {
@@ -49,7 +89,6 @@ void allocator_destroy(void) {
     g_head = NULL;
 }
 
-// First-fit search, no block splitting yet (added in Round 2)
 void* a_malloc(size_t size) {
     if (!g_arena || size == 0) return NULL;
 
@@ -58,31 +97,36 @@ void* a_malloc(size_t size) {
 
     while (cur) {
         if (cur->free && cur->size >= size) {
-            cur->free = 0;
-            // (Round 2: split large blocks here)
-            return (void*)((uint8_t*)cur + sizeof(block_t));
+            // split if there's enough space for a new block header + minimal payload
+            size_t remaining = cur->size - size;
+            if (remaining >= sizeof(block_t) + 8) {
+                uint8_t* newptr = (uint8_t*)cur + sizeof(block_t) + size;
+                block_t* newblk = (block_t*)newptr;
+                newblk->size = remaining - sizeof(block_t);
+                newblk->free = 1;
+                newblk->next = NULL; // implicit list
+
+                cur->size = size;
+                cur->free = 0;
+                return (void*)((uint8_t*)cur + sizeof(block_t));
+            } else {
+                // no split: take whole block
+                cur->free = 0;
+                return (void*)((uint8_t*)cur + sizeof(block_t));
+            }
         }
-        cur = cur->next;
+        cur = next_block(cur);
     }
     return NULL; // out of memory
 }
 
-// Mark free; (Round 2: coalesce adjacent free blocks)
 void a_free(void* ptr) {
     if (!ptr) return;
     block_t* blk = (block_t*)((uint8_t*)ptr - sizeof(block_t));
     blk->free = 1;
+    coalesce(blk);
 }
 
-// (Optional helper for Round 2: iterate blocks)
-static block_t* next_block(block_t* blk) {
-    if (!blk) return NULL;
-    uint8_t* p = (uint8_t*)blk + sizeof(block_t) + blk->size;
-    if ((void*)p >= (uint8_t*)g_arena + g_arena_size) return NULL;
-    return (block_t*)p;
-}
-
-// (Optional sanity check — useful during Round 2)
 __attribute__((unused))
 static int heap_ok(void) {
     size_t total = 0;
@@ -96,3 +140,19 @@ static int heap_ok(void) {
     }
     return total == g_arena_size;
 }
+
+#ifdef ALLOCATOR_DEBUG
+void allocator_dump(void) {
+    printf("=== Heap dump ===\n");
+    block_t* cur = g_head;
+    size_t i = 0, used = 0, freeb = 0;
+    while (cur) {
+        printf("Block %zu: addr=%p size=%zu %s\n",
+               i, (void*)cur, cur->size, cur->free ? "FREE" : "USED");
+        if (cur->free) freeb += cur->size; else used += cur->size;
+        cur = next_block(cur);
+        i++;
+    }
+    printf("Total used=%zu free=%zu (arena=%zu)\n", used, freeb, g_arena_size);
+}
+#endif
