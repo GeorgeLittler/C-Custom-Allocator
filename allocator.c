@@ -20,8 +20,9 @@ static size_t align8(size_t n) { return (n + 7u) & ~((size_t)7u); }
 
 static block_t* next_block(block_t* blk) {
     if (!blk) return NULL;
-    uint8_t* p = (uint8_t*)blk + sizeof(block_t) + blk->size;
-    if ((void*)p >= (uint8_t*)g_arena + g_arena_size) return NULL;
+    uint8_t* p   = (uint8_t*)blk + sizeof(block_t) + blk->size;
+    uint8_t* end = (uint8_t*)g_arena + g_arena_size;
+    if (p >= end) return NULL;
     return (block_t*)p;
 }
 
@@ -131,8 +132,10 @@ __attribute__((unused))
 static int heap_ok(void) {
     size_t total = 0;
     uint8_t* start = (uint8_t*)g_arena;
-    block_t* cur = (block_t*)start;
-    while ((void*)cur < start + g_arena_size) {
+    uint8_t* end   = start + g_arena_size;
+    block_t* cur   = (block_t*)start;
+
+    while ((uint8_t*)cur < end) {
         total += sizeof(block_t) + cur->size;
         block_t* nb = next_block(cur);
         if (!nb) break;
